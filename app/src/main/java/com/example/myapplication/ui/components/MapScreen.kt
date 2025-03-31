@@ -1,5 +1,7 @@
 package com.example.myapplication.ui.components
 
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,14 +44,24 @@ fun MapScreen(
                 MapView(context).apply {
                     setTileSource(TileSourceFactory.MAPNIK)
                     controller.setZoom(15.0)
+                    val matrixA = ColorMatrix()
+                    matrixA.setSaturation(0.3f)
+                    val matrixB = ColorMatrix()
+                    matrixB.setScale(1.12f, 1.13f, 1.13f, 1.0f)
+                    matrixA.setConcat(matrixB, matrixA)
+                    val filter = ColorMatrixColorFilter(matrixA)
+                    overlayManager.tilesOverlay.setColorFilter(filter)
                     setMultiTouchControls(true)
                     
                     val rotationGestureOverlay = RotationGestureOverlay(this)
                     rotationGestureOverlay.isEnabled = true
                     overlays.add(rotationGestureOverlay)
-                    
-                    locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), this)
-                    locationOverlay?.enableMyLocation()
+
+                    val startPoint = GeoPoint(48.8566, 2.3522)
+                    controller.setCenter(startPoint)
+
+                    val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), this)
+                    locationOverlay.enableMyLocation()
                     overlays.add(locationOverlay)
                     
                     mapView = this
