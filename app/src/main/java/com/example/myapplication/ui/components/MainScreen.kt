@@ -13,6 +13,7 @@ import com.example.myapplication.ui.screens.HistoryScreen
 import com.example.myapplication.ui.screens.SubscriptionsScreen
 import com.example.myapplication.ui.screens.SettingsScreen
 import com.example.myapplication.data.RideHistoryItem
+import com.example.myapplication.ui.screens.SubscriptionItem
 
 sealed class Screen {
     object Map : Screen()
@@ -38,19 +39,19 @@ fun MainScreen(
     val scope = rememberCoroutineScope()
 
     val sidebarItems = listOf(
-        SidebarItem("Carte", Icons.Default.Map) { 
+        SidebarItem("Carte", Icons.Default.MoreVert) {
             currentScreen = Screen.Map
             scope.launch { drawerState.close() }
         },
-        SidebarItem("Historique", Icons.Default.History) { 
+        SidebarItem("Historique", Icons.Default.Menu) {
             currentScreen = Screen.History
             scope.launch { drawerState.close() }
         },
-        SidebarItem("Abonnements", Icons.Default.Subscriptions) { 
+        SidebarItem("Abonnements", Icons.Default.AccountBox) {
             currentScreen = Screen.Subscriptions
             scope.launch { drawerState.close() }
         },
-        SidebarItem("Réglages", Icons.Default.Settings) { 
+        SidebarItem("Réglages", Icons.Default.Settings) {
             currentScreen = Screen.Settings
             scope.launch { drawerState.close() }
         }
@@ -70,7 +71,7 @@ fun MainScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { 
+                    title = {
                         Text(
                             when (currentScreen) {
                                 Screen.Map -> "SkateApp"
@@ -113,8 +114,12 @@ fun MainScreen(
                         onRideClick = onRideClick
                     )
                     Screen.Subscriptions -> SubscriptionsScreen(
-                        subscriptions = emptyList(),
-                        onSubscribe = {}
+                        subscriptions = listOf(
+                            SubscriptionItem("1", "60 min", "À utiliser sous 3 jours", 7.99, "mois", listOf("Skate", "Abonnement"), "Basique"),
+                            SubscriptionItem("2", "200 min", "à utiliser sous 7 jours", 23.99, "mois", listOf("Skate", "Abonnement"), "Standard"),
+                            SubscriptionItem("3", "300 min", "à utiliser sous 30 jours", 34.99, "mois", listOf("Skate", "Abonnement"), "Premium")
+                        ),
+                        onSubscribe = { subscription -> println("Abonné à ${subscription.name}") }
                     )
                     Screen.Settings -> SettingsScreen(
                         onLogout = onLogout,
@@ -124,4 +129,4 @@ fun MainScreen(
             }
         }
     }
-} 
+}

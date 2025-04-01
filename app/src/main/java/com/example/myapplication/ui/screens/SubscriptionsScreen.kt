@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -19,7 +20,7 @@ fun SubscriptionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Abonnements") }
+                title = { Text("SkatyPass") }
             )
         }
     ) { paddingValues ->
@@ -44,6 +45,13 @@ fun SubscriptionCard(
     subscription: SubscriptionItem,
     onSubscribe: () -> Unit
 ) {
+    val typeColor = when (subscription.type) {
+        "Premium" -> Color(0xFFFFD700)
+        "Standard" -> Color(0xFF4CAF50)
+        "Basique" -> Color(0xFF2196F3)
+        else -> Color.Gray
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -58,6 +66,12 @@ fun SubscriptionCard(
             Text(
                 text = subscription.name,
                 style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subscription.type,
+                color = typeColor,
+                style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -87,5 +101,6 @@ data class SubscriptionItem(
     val description: String,
     val price: Double,
     val period: String,
-    val features: List<String>
-) 
+    val features: List<String>,
+    val type: String // Nouveau champ pour indiquer le type d'abonnement
+)
