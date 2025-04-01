@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 @Composable
 fun SubscriptionsScreen(
     subscriptions: List<SubscriptionItem>,
+    currentSubscription: SubscriptionItem?,
     onSubscribe: (SubscriptionItem) -> Unit
 ) {
     Scaffold(
@@ -32,6 +33,7 @@ fun SubscriptionsScreen(
             items(subscriptions) { subscription ->
                 SubscriptionCard(
                     subscription = subscription,
+                    isSubscribed = currentSubscription?.id == subscription.id,
                     onSubscribe = { onSubscribe(subscription) }
                 )
             }
@@ -43,6 +45,7 @@ fun SubscriptionsScreen(
 @Composable
 fun SubscriptionCard(
     subscription: SubscriptionItem,
+    isSubscribed: Boolean,
     onSubscribe: () -> Unit
 ) {
     val typeColor = when (subscription.type) {
@@ -87,9 +90,10 @@ fun SubscriptionCard(
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onSubscribe,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSubscribed  // Désactiver le bouton si déjà abonné
             ) {
-                Text("S'abonner")
+                Text(if (isSubscribed) "Abonnement actif" else "S'abonner")
             }
         }
     }
@@ -102,5 +106,5 @@ data class SubscriptionItem(
     val price: Double,
     val period: String,
     val features: List<String>,
-    val type: String // Nouveau champ pour indiquer le type d'abonnement
+    val type: String
 )

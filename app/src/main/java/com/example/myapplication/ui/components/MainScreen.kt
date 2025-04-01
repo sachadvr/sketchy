@@ -13,6 +13,7 @@ import com.example.myapplication.ui.screens.HistoryScreen
 import com.example.myapplication.ui.screens.SubscriptionsScreen
 import com.example.myapplication.ui.screens.SettingsScreen
 import com.example.myapplication.data.RideHistoryItem
+import com.example.myapplication.data.SubscriptionManager
 import com.example.myapplication.ui.screens.SubscriptionItem
 
 sealed class Screen {
@@ -20,6 +21,7 @@ sealed class Screen {
     object History : Screen()
     object Subscriptions : Screen()
     object Settings : Screen()
+    object Profile : Screen()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,9 +40,16 @@ fun MainScreen(
     var drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
+    val subscriptionManager = remember { SubscriptionManager() }
+    var currentSubscription by remember { mutableStateOf<SubscriptionItem?>(null) }
+
     val sidebarItems = listOf(
         SidebarItem("Carte", Icons.Default.MoreVert) {
             currentScreen = Screen.Map
+            scope.launch { drawerState.close() }
+        },
+        SidebarItem("Profil", Icons.Default.Person) {
+            currentScreen = Screen.Profile
             scope.launch { drawerState.close() }
         },
         SidebarItem("Historique", Icons.Default.Menu) {
@@ -77,6 +86,7 @@ fun MainScreen(
                                 Screen.Map -> "SkateApp"
                                 Screen.History -> "Historique"
                                 Screen.Subscriptions -> "Abonnements"
+                                Screen.Profile -> "Mon Profil"
                                 Screen.Settings -> "Réglages"
                             }
                         )
@@ -116,10 +126,30 @@ fun MainScreen(
                     Screen.Subscriptions -> SubscriptionsScreen(
                         subscriptions = listOf(
                             SubscriptionItem("1", "60 min", "À utiliser sous 3 jours", 7.99, "mois", listOf("Skate", "Abonnement"), "Basique"),
-                            SubscriptionItem("2", "200 min", "à utiliser sous 7 jours", 23.99, "mois", listOf("Skate", "Abonnement"), "Standard"),
-                            SubscriptionItem("3", "300 min", "à utiliser sous 30 jours", 34.99, "mois", listOf("Skate", "Abonnement"), "Premium")
+                            SubscriptionItem("2", "200 min", "À utiliser sous 7 jours", 23.99, "mois", listOf("Skate", "Abonnement"), "Standard"),
+                            SubscriptionItem("3", "300 min", "À utiliser sous 30 jours", 34.99, "mois", listOf("Skate", "Abonnement"), "Premium")
                         ),
-                        onSubscribe = { subscription -> println("Abonné à ${subscription.name}") }
+                        currentSubscription = currentSubscription, // Utiliser directement l'état réactif
+                        onSubscribe = { subscription ->
+                            println("Tentative d'abonnement à ${subscription.name}")
+                            if (currentSubscription == null) {
+                                subscriptionManager.subscribe(subscription)
+                                currentSubscription = subscription
+                            } else {
+                                println("Un abonnement est déjà actif")
+                            }
+                        }
+
+                    )
+                    Screen.Profile -> ProfileScreen(
+                        currentSubscription = currentSubscription,
+                        onUnsubscribe = { subscription ->
+                            subscriptionManager.unsubscribe(subscription)
+                            currentSubscription = null
+                            // Vous pouvez rediriger vers un autre écran, par exemple revenir aux abonnements
+                            currentScreen = Screen.Subscriptions
+                        },
+                        onBack = { currentScreen = Screen.Subscriptions }
                     )
                     Screen.Settings -> SettingsScreen(
                         onLogout = onLogout,
