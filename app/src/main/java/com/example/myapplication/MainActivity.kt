@@ -2,7 +2,6 @@ package com.example.myapplication
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.os.Bundle
 import android.os.SystemClock
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -17,6 +16,18 @@ import com.example.myapplication.data.RideHistoryItem
 import com.example.myapplication.ui.components.MainScreen
 import org.osmdroid.util.GeoPoint
 import java.util.*
+import android.os.Bundle
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import io.github.jan.supabase.postgrest.postgrest
+
+val supabase = SupabaseManager.client
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -30,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        testFetchSkates()
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
@@ -156,4 +168,31 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-} 
+}
+@Serializable
+data class Skate(
+    val id: String,
+    val serial_number: String,
+    val model: String,
+    val status: String,
+    val created_at: String
+)
+
+// 🧪 Fonction de test Supabase
+fun testFetchSkates() {
+    Log.d("TEST", "testFetchSkates() a été appelée")
+
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val result = SupabaseManager.client.postgrest["skates"]
+                .select()
+                .decodeList<Skate>()
+
+            result.forEach {
+                Log.d("SKATE", "🛹 ${it.model} - ${it.status}")
+            }
+        } catch (e: Exception) {
+            Log.e("SUPABASE", "Erreur: ${e.message}", e)
+        }
+    }
+}
