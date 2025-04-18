@@ -25,9 +25,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import io.github.jan.supabase.postgrest.postgrest
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 val supabase = SupabaseManager.client
-
 
 class MainActivity : AppCompatActivity() {
 
@@ -39,9 +40,13 @@ class MainActivity : AppCompatActivity() {
     private val LOCATION_PERMISSION_REQUEST = 100
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SupabaseManager.init(this)
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        testFetchSkates()
+
+        val mapView = findViewById<MapView>(R.id.mapView)
+        mapView.setMultiTouchControls(true)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
@@ -49,6 +54,8 @@ class MainActivity : AppCompatActivity() {
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                 LOCATION_PERMISSION_REQUEST)
         }
+
+        testFetchSkates(mapView)
 
         findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeView).setContent {
             MainScreen(
@@ -168,6 +175,50 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun afficherSkatesSurCarte(skates: List<Skate>, mapView: MapView) {
+        skates.forEach { skate ->
+            val coords = skate.coordonnees
+            if (coords != null) {
+                val lat = coords["lat"]
+                val lon = coords["lon"]
+
+                if (lat != null && lon != null) {
+                    val point = GeoPoint(lat, lon)
+                    val marker = Marker(mapView)
+                    marker.position = point
+                    marker.title = skate.model
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+
+                    // Optionnel : icône custom
+                    // marker.icon = ResourcesCompat.getDrawable(resources, R.drawable.ic_skate, null)
+
+                    mapView.overlays.add(marker)
+                }
+            }
+        }
+        // Centrer la carte sur Lille
+        mapView.controller.setCenter(GeoPoint(50.62925, 3.057256))
+        mapView.controller.setZoom(15.0)
+    }
+
+    fun testFetchSkates(mapView: MapView) {
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val skates = SupabaseManager.client.postgrest["skates"]
+                    .select()
+                    .decodeList<Skate>()
+
+                this@MainActivity.runOnUiThread {
+                    afficherSkatesSurCarte(skates, mapView)
+                }
+
+            } catch (e: Exception) {
+                Log.e("SUPABASE", "Erreur: ${e.message}", e)
+            }
+        }
+    }
 }
 @Serializable
 data class Skate(
@@ -175,24 +226,6 @@ data class Skate(
     val serial_number: String,
     val model: String,
     val status: String,
-    val created_at: String
+    val created_at: String,
+    val coordonnees: Map<String, Double>? = null
 )
-
-// 🧪 Fonction de test Supabase
-fun testFetchSkates() {
-    Log.d("TEST", "testFetchSkates() a été appelée")
-
-    CoroutineScope(Dispatchers.IO).launch {
-        try {
-            val result = SupabaseManager.client.postgrest["skates"]
-                .select()
-                .decodeList<Skate>()
-
-            result.forEach {
-                Log.d("SKATE", "🛹 ${it.model} - ${it.status}")
-            }
-        } catch (e: Exception) {
-            Log.e("SUPABASE", "Erreur: ${e.message}", e)
-        }
-    }
-}
