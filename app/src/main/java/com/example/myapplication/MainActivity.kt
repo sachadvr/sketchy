@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.content.res.ResourcesCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,6 +28,8 @@ import kotlinx.serialization.Serializable
 import io.github.jan.supabase.postgrest.postgrest
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import androidx.compose.runtime.*
+import com.example.myapplication.ui.components.AppContent
 
 val supabase = SupabaseManager.client
 
@@ -41,9 +44,23 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         SupabaseManager.init(this)
-
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Récupère ton rideHistory, mapView, etc. ici
+        val rides: List<RideHistoryItem> = rideHistory.getRides()
+
+        findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeView).setContent {
+            AppContent(
+                rideHistory   = rides,
+                onRideClick   = { ride -> showRideDetails(ride) },
+                onLogout      = { finish() },
+                onDeleteAccount = { finish() },
+                onStartRide   = { location -> showStartRideConfirmation(location) },
+                onEndRide     = { showEndRideConfirmation() },
+                elapsedTime   = elapsedTime
+            )
+        }
 
         val mapView = findViewById<MapView>(R.id.mapView)
         mapView.setMultiTouchControls(true)
@@ -58,6 +75,13 @@ class MainActivity : AppCompatActivity() {
         testFetchSkates(mapView)
 
         findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeView).setContent {
+            var subscriptionPlans = listOf<SubscriptionPlan>()
+
+            LaunchedEffect(Unit) {
+                fetchSubscriptionPlans { plans ->
+                    subscriptionPlans = plans
+                }
+            }
             MainScreen(
                 isRideActive = isRideActive,
                 onStartRide = { location -> showStartRideConfirmation(location) },
@@ -70,7 +94,8 @@ class MainActivity : AppCompatActivity() {
                     finish()
                 },
                 rideHistory = rideHistory.getRides(),
-                onRideClick = { ride -> showRideDetails(ride) }
+                onRideClick = { ride -> showRideDetails(ride) },
+                subscriptionPlans = subscriptionPlans
             )
         }
 
@@ -219,6 +244,31 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    fun fetchSubscriptionPlans(onResult: (List<SubscriptionPlan>) -> Unit) {
+        Log.d("DEBUG", "🔥 fetchSubscriptionPlans lancé")
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val result = SupabaseManager.client
+                    .postgrest["subscription_plans"]
+                    .select()
+                    .decodeList<SubscriptionPlan>()
+
+                Log.d("DEBUG", "Taille totale reçue : ${result.size}")
+                result.forEach {
+                    Log.d("DEBUG", "📦 ${it.name} - ${it.price}€ - ${it.type}")
+                }
+
+                runOnUiThread {
+                    onResult(result)
+                }
+
+            } catch (e: Exception) {
+                Log.e("SUPABASE", "Erreur fetch abonnements: ${e.message}", e)
+            }
+        }
+    }
 }
 @Serializable
 data class Skate(
@@ -229,3 +279,26 @@ data class Skate(
     val created_at: String,
     val coordonnees: Map<String, Double>? = null
 )
+
+@Serializable
+data class SubscriptionPlan(
+    val id: String,
+    val name: String,
+    val description: String?,
+    val price: Double,
+    val period: String,
+    val type: String,
+    val features: List<String>,
+    val created_at: String
+)
+
+data class SubscriptionItem(
+    val id: String,
+    val duration: String,
+    val description: String,
+    val price: Double,
+    val period: String,
+    val tags: List<String>,
+    val name: String
+)
+

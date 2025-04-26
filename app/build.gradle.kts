@@ -77,9 +77,13 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
+    // Client principal
     implementation("io.github.jan-tennert.supabase:supabase-kt:1.3.1")
+    // Auth (GoTrue)
     implementation("io.github.jan-tennert.supabase:gotrue-kt:1.3.1")
+    // Postgrest (CRUD)
     implementation("io.github.jan-tennert.supabase:postgrest-kt:1.3.1")
+
 
     implementation("io.ktor:ktor-client-okhttp:2.3.4")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")

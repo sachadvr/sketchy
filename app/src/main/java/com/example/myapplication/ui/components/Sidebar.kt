@@ -35,7 +35,7 @@ fun Sidebar(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "SkateApp",
+                text = "Sketchy",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary
             )

@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,6 +16,19 @@ import com.example.myapplication.ui.screens.SettingsScreen
 import com.example.myapplication.data.RideHistoryItem
 import com.example.myapplication.data.SubscriptionManager
 import com.example.myapplication.ui.screens.SubscriptionItem
+import com.example.myapplication.SubscriptionPlan
+import com.example.myapplication.SupabaseManager
+import com.example.myapplication.data.UserSubscription
+import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.launch
+import io.github.jan.supabase.gotrue.gotrue
+import io.github.jan.supabase.gotrue.GoTrue
+
 
 sealed class Screen {
     object Map : Screen()
@@ -34,8 +48,23 @@ fun MainScreen(
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
     rideHistory: List<RideHistoryItem>,
-    onRideClick: (RideHistoryItem) -> Unit
+    onRideClick: (RideHistoryItem) -> Unit,
+    subscriptionPlans: List<SubscriptionPlan>
 ) {
+
+    var subscriptionPlans by remember { mutableStateOf<List<SubscriptionPlan>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        SupabaseManager.client
+            .postgrest["subscription_plans"]
+            .select()
+            .decodeList<SubscriptionPlan>()
+            .let { plans ->
+                subscriptionPlans = plans
+                Log.d("DEBUG", "MainScreen → abonnements : ${plans.size}")
+            }
+    }
+
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Map) }
     var drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -83,7 +112,7 @@ fun MainScreen(
                     title = {
                         Text(
                             when (currentScreen) {
-                                Screen.Map -> "SkateApp"
+                                Screen.Map -> "Sketchy"
                                 Screen.History -> "Historique"
                                 Screen.Subscriptions -> "Abonnements"
                                 Screen.Profile -> "Mon Profil"
@@ -123,24 +152,49 @@ fun MainScreen(
                         rides = rideHistory,
                         onRideClick = onRideClick
                     )
-                    Screen.Subscriptions -> SubscriptionsScreen(
-                        subscriptions = listOf(
-                            SubscriptionItem("1", "60 min", "À utiliser sous 3 jours", 7.99, "mois", listOf("Skate", "Abonnement"), "Basique"),
-                            SubscriptionItem("2", "200 min", "À utiliser sous 7 jours", 23.99, "mois", listOf("Skate", "Abonnement"), "Standard"),
-                            SubscriptionItem("3", "300 min", "À utiliser sous 30 jours", 34.99, "mois", listOf("Skate", "Abonnement"), "Premium")
-                        ),
-                        currentSubscription = currentSubscription, // Utiliser directement l'état réactif
-                        onSubscribe = { subscription ->
-                            println("Tentative d'abonnement à ${subscription.name}")
-                            if (currentSubscription == null) {
-                                subscriptionManager.subscribe(subscription)
-                                currentSubscription = subscription
-                            } else {
-                                println("Un abonnement est déjà actif")
-                            }
+                    Screen.Subscriptions -> {
+                        val subscriptionItems = subscriptionPlans.map {
+                            SubscriptionItem(
+                                id = it.id,
+                                name = it.name,
+                                description = it.description ?: "",
+                                price = it.price,
+                                type =it.type,
+                                period = it.period,
+                                features = it.features
+                            )
                         }
+                        SubscriptionsScreen(
+                            subscriptions = subscriptionItems,
+                            currentSubscription = currentSubscription,
+                            onSubscribe = fun(subscription: SubscriptionItem) {
+                                val userId = SupabaseManager.client.gotrue.currentUserOrNull()?.id
+                                val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
 
-                    )
+                                if (userId == null) {
+                                    Log.e("SUB", "❌ Impossible de récupérer l'ID utilisateur")
+                                    return
+                                }
+
+                                val newSub = UserSubscription(
+                                    user_id = userId,
+                                    subscription_plan_id = subscription.id,
+                                    start_date = today
+                                )
+
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
+                                        SupabaseManager.client.postgrest["user_subscriptions"]
+                                            .insert(newSub)
+                                        Log.d("SUB", "✅ Abonnement enregistré !")
+                                    } catch (e: Exception) {
+                                        Log.e("SUB", "❌ Erreur d'enregistrement : ${e.message}", e)
+                                    }
+                                }
+                            }
+
+                        )
+                    }
                     Screen.Profile -> ProfileScreen(
                         currentSubscription = currentSubscription,
                         onUnsubscribe = { subscription ->
