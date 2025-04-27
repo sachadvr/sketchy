@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.res.ResourcesCompat
+import com.example.myapplication.R
 import com.example.myapplication.data.model.RideHistoryItem
 import com.example.myapplication.data.model.Skate
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -46,6 +48,7 @@ fun MapView(
                     title = "Skate ${skate.model}"
                     snippet = "Batterie: ${skate.batteryLevel}%"
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    icon = ResourcesCompat.getDrawable(context.resources, R.drawable.skate, null)
                     setOnMarkerClickListener { _, _ ->
                         onSkateClick(skate, point)
                         true

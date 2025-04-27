@@ -221,8 +221,8 @@ class MainActivity : AppCompatActivity() {
                     marker.title = skate.model
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
-                    // Optionnel : icône custom
-                    // marker.icon = ResourcesCompat.getDrawable(resources, R.drawable.ic_skate, null)
+                    // Utiliser l'icône du skate
+                    marker.icon = ResourcesCompat.getDrawable(resources, R.drawable.skate, null)
 
                     mapView.overlays.add(marker)
                 }
