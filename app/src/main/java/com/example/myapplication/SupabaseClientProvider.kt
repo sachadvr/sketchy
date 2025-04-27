@@ -6,6 +6,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.gotrue.auth
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,7 +22,11 @@ class SupabaseClientProvider @Inject constructor(
                 supabaseUrl = Config.SUPABASE_URL,
                 supabaseKey = Config.SUPABASE_ANON_KEY
             ) {
-                install(Auth)
+                install(Auth) {
+                    // Configuration pour les redirections OAuth
+                    scheme = "app"
+                    host = "supabase.com"
+                }
                 install(Postgrest)
                 install(Realtime)
             }
