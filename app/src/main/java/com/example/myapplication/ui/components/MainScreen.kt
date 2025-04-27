@@ -17,8 +17,10 @@ import com.example.myapplication.ui.screens.SettingsScreen
 import com.example.myapplication.data.RideHistoryItem
 import com.example.myapplication.data.SubscriptionManager
 import com.example.myapplication.ui.screens.SubscriptionItem
-import com.example.myapplication.SubscriptionPlan
+import com.example.myapplication.data.model.SubscriptionPlan
+import com.example.myapplication.data.model.SubscriptionType
 import com.example.myapplication.data.UserSubscription
+import com.example.myapplication.SubscriptionPlanDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.gotrue.auth
@@ -68,9 +70,27 @@ fun MainScreen(
 
     LaunchedEffect(Unit) {
         try {
-            val plans = supabaseClient.postgrest["subscription_plans"]
+            // On récupère d'abord les données Supabase dans une structure temporaire
+            val supabasePlans = supabaseClient.postgrest["subscription_plans"]
                 .select()
-                .decodeList<SubscriptionPlan>()
+                .decodeList<SubscriptionPlanDto>()
+            
+            // Puis on les convertit vers notre modèle local
+            val plans = supabasePlans.map { dto ->
+                SubscriptionPlan(
+                    id = dto.id,
+                    name = dto.name,
+                    description = dto.description ?: "",
+                    pricePerMonth = dto.price,
+                    features = dto.features,
+                    type = when (dto.type.uppercase()) {
+                        "PREMIUM" -> SubscriptionType.PREMIUM
+                        "UNLIMITED" -> SubscriptionType.UNLIMITED
+                        else -> SubscriptionType.BASIC
+                    }
+                )
+            }
+            
             currentSubscriptionPlans = plans
             Log.d("DEBUG", "MainScreen → abonnements : ${plans.size}")
         } catch (e: Exception) {
@@ -168,15 +188,15 @@ fun MainScreen(
                         onRideClick = onRideClick
                     )
                     Screen.Subscriptions -> {
-                        val subscriptionItems = currentSubscriptionPlans.map {
+                        val subscriptionItems = currentSubscriptionPlans.map { plan ->
                             SubscriptionItem(
-                                id = it.id,
-                                name = it.name,
-                                description = it.description ?: "",
-                                price = it.price,
-                                type = it.type,
-                                period = it.period,
-                                features = it.features
+                                id = plan.id,
+                                name = plan.name,
+                                description = plan.description,
+                                price = plan.pricePerMonth,
+                                type = plan.type.toString(),
+                                period = "MONTHLY", // Valeur par défaut
+                                features = plan.features
                             )
                         }
                         SubscriptionsScreen(

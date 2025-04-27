@@ -20,12 +20,14 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.res.ResourcesCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.gotrue.auth
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import androidx.compose.runtime.*
@@ -33,6 +35,32 @@ import com.example.myapplication.ui.components.AppContent
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import io.github.jan.supabase.SupabaseClient
+import com.example.myapplication.data.model.SubscriptionPlan
+import com.example.myapplication.data.model.SubscriptionType
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.ui.screens.LoginScreen
+import com.example.myapplication.ui.screens.RegisterScreen
+import com.example.myapplication.ui.screens.HomeScreen
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -51,25 +79,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Récupère ton rideHistory, mapView, etc. ici
-        val rides: List<RideHistoryItem> = rideHistory.getRides()
-
-        findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeView).setContent {
-            AppContent(
-                supabaseClient = supabaseClient,
-                rideHistory = rides,
-                onRideClick = { ride -> showRideDetails(ride) },
-                onLogout = { finish() },
-                onDeleteAccount = { finish() },
-                onStartRide = { location -> showStartRideConfirmation(location) },
-                onEndRide = { showEndRideConfirmation() },
-                elapsedTime = elapsedTime
-            )
-        }
-
-        val mapView = findViewById<MapView>(R.id.mapView)
-        mapView.setMultiTouchControls(true)
-
+        // Demande des permissions de localisation
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -77,40 +87,83 @@ class MainActivity : AppCompatActivity() {
                 LOCATION_PERMISSION_REQUEST)
         }
 
-        testFetchSkates(mapView)
-
+        // Configuration de l'interface utilisateur avec Compose
         findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeView).setContent {
-            var subscriptionPlans = listOf<SubscriptionPlan>()
+            // Variables pour stocker les données
+            var subscriptionPlans by remember { mutableStateOf(listOf<SubscriptionPlan>()) }
+            val rides: List<RideHistoryItem> = rideHistory.getRides()
 
+            // Chargement des plans d'abonnement
             LaunchedEffect(Unit) {
-                fetchSubscriptionPlans { plans ->
-                    subscriptionPlans = plans
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val plans = supabaseClient.postgrest["subscription_plans"]
+                            .select()
+                            .decodeList<SubscriptionPlan>()
+                        subscriptionPlans = plans
+                    } catch (e: Exception) {
+                        Log.e("SUPABASE", "Erreur lors du chargement des abonnements: ${e.message}", e)
+                    }
                 }
             }
-            MainScreen(
+
+            // Affichage du contenu principal de l'application
+            AppContent(
                 supabaseClient = supabaseClient,
-                isRideActive = isRideActive,
-                onStartRide = { location -> showStartRideConfirmation(location) },
-                onEndRide = { showEndRideConfirmation() },
-                elapsedTime = elapsedTime,
-                onLogout = {
-                    finish()
+                rideHistory = rides,
+                onRideClick = { ride -> showRideDetails(ride) },
+                onLogout = { 
+                    // Déconnexion de l'utilisateur
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            supabaseClient.auth.signOut()
+                        } catch (e: Exception) {
+                            Log.e("SUPABASE", "Erreur lors de la déconnexion: ${e.message}", e)
+                        }
+                    }
                 },
                 onDeleteAccount = {
-                    finish()
+                    // Supprimer le compte utilisateur
+                    AlertDialog.Builder(this)
+                        .setTitle("Supprimer le compte")
+                        .setMessage("Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.")
+                        .setPositiveButton("Oui") { _, _ ->
+                            CoroutineScope(Dispatchers.IO).launch {
+                                try {
+                                    // Supabase ne fournit pas de méthode deleteUser, utilisons signOut
+                                    supabaseClient.auth.signOut()
+                                    runOnUiThread {
+                                        // Informer l'utilisateur
+                                        AlertDialog.Builder(this@MainActivity)
+                                            .setTitle("Compte déconnecté")
+                                            .setMessage("Vous avez été déconnecté. Pour supprimer complètement votre compte, veuillez contacter le support.")
+                                            .setPositiveButton("OK", null)
+                                            .show()
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("SUPABASE", "Erreur lors de la suppression du compte: ${e.message}", e)
+                                }
+                            }
+                        }
+                        .setNegativeButton("Non", null)
+                        .show()
                 },
-                rideHistory = rideHistory.getRides(),
-                onRideClick = { ride -> showRideDetails(ride) },
-                subscriptionPlans = subscriptionPlans
+                onStartRide = { location -> showStartRideConfirmation(location) },
+                onEndRide = { showEndRideConfirmation() },
+                elapsedTime = elapsedTime
             )
         }
 
-        startTime = SystemClock.elapsedRealtime()
+        // Démarrage du thread de suivi du temps
+        startTimeTrackingThread()
+    }
+
+    private fun startTimeTrackingThread() {
         Thread {
             while (true) {
                 if (isRideActive) {
                     elapsedTime = SystemClock.elapsedRealtime() - startTime
-                    // Ici, vous devriez ajouter la position actuelle au chemin
+                    // Ici, vous pourriez ajouter la position actuelle au chemin
                     // currentPath = currentPath + currentLocation
                 }
                 Thread.sleep(1000)
@@ -155,7 +208,7 @@ class MainActivity : AppCompatActivity() {
         val ride = RideHistoryItem(
             id = UUID.randomUUID().toString(),
             date = Date(),
-            distance = calculateDistance(currentPath), // À implémenter
+            distance = calculateDistance(currentPath),
             duration = elapsedTime,
             price = price,
             path = currentPath
@@ -203,6 +256,7 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == LOCATION_PERMISSION_REQUEST) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission accordée
             }
         }
     }
@@ -234,7 +288,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun testFetchSkates(mapView: MapView) {
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val skates = supabaseClient.postgrest["skates"]
@@ -256,18 +309,35 @@ class MainActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val result = supabaseClient
+                // On récupère d'abord les données Supabase dans une structure temporaire
+                val supabasePlans = supabaseClient
                     .postgrest["subscription_plans"]
                     .select()
-                    .decodeList<SubscriptionPlan>()
+                    .decodeList<SubscriptionPlanDto>()
+                
+                // Puis on les convertit vers notre modèle local
+                val plans = supabasePlans.map { dto ->
+                    SubscriptionPlan(
+                        id = dto.id,
+                        name = dto.name,
+                        description = dto.description ?: "",
+                        pricePerMonth = dto.price,
+                        features = dto.features,
+                        type = when (dto.type.uppercase()) {
+                            "PREMIUM" -> SubscriptionType.PREMIUM
+                            "UNLIMITED" -> SubscriptionType.UNLIMITED
+                            else -> SubscriptionType.BASIC
+                        }
+                    )
+                }
 
-                Log.d("DEBUG", "Taille totale reçue : ${result.size}")
-                result.forEach {
-                    Log.d("DEBUG", "📦 ${it.name} - ${it.price}€ - ${it.type}")
+                Log.d("DEBUG", "Taille totale reçue : ${plans.size}")
+                plans.forEach {
+                    Log.d("DEBUG", "📦 ${it.name} - ${it.pricePerMonth}€ - ${it.type}")
                 }
 
                 runOnUiThread {
-                    onResult(result)
+                    onResult(plans)
                 }
 
             } catch (e: Exception) {
@@ -276,6 +346,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
+
 @Serializable
 data class Skate(
     val id: String,
@@ -286,8 +357,9 @@ data class Skate(
     val coordonnees: Map<String, Double>? = null
 )
 
+// Modèle pour la désérialisation des données de Supabase
 @Serializable
-data class SubscriptionPlan(
+data class SubscriptionPlanDto(
     val id: String,
     val name: String,
     val description: String?,
@@ -307,4 +379,48 @@ data class SubscriptionItem(
     val tags: List<String>,
     val name: String
 )
+
+@Composable
+fun AppNavigation(supabaseClient: SupabaseClient) {
+    val navController = rememberNavController()
+    
+    NavHost(navController = navController, startDestination = "login") {
+        composable("login") {
+            LoginScreen(
+                supabaseClient = supabaseClient,
+                onLoginSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                onRegisterClick = {
+                    navController.navigate("register")
+                }
+            )
+        }
+        
+        composable("register") {
+            RegisterScreen(
+                supabaseClient = supabaseClient,
+                onRegisterSuccess = {
+                    navController.navigate("login")
+                },
+                onLoginClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        composable("home") {
+            HomeScreen(
+                supabaseClient = supabaseClient,
+                onLogout = {
+                    navController.navigate("login") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
+        }
+    }
+}
 
