@@ -1,10 +1,12 @@
 package com.example.myapplication.ui.components
 
+import android.content.Context
+import android.location.Location
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.myapplication.model.MyLocation
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -34,13 +37,12 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     var mapView by remember { mutableStateOf<MapView?>(null) }
-    var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
     var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var isFirstLocation by remember { mutableStateOf(true) }
     val markers = remember { mutableStateListOf<Marker>() }
     val random = remember { Random() }
 
-    val lilleLocation = remember { GeoPoint(50.6292, 3.0573) } // FOR TESTS ONLY (Mehdi's Location)
+    val lilleLocation = remember { GeoPoint(50.6292, 3.0573) }
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", 0))
@@ -85,8 +87,7 @@ fun MapScreen(
 
                     val myLocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), this)
                     myLocationOverlay.enableMyLocation()
-                    myLocationOverlay.setPersonHotspot(0f, 0f)
-
+                    
                     val bitmap = android.graphics.Bitmap.createBitmap(40, 40, android.graphics.Bitmap.Config.ARGB_8888)
                     val canvas = android.graphics.Canvas(bitmap)
                     val paint = android.graphics.Paint().apply {
@@ -142,9 +143,9 @@ fun MapScreen(
                         view.overlays.add(marker)
 
                         val polyline = Polyline().apply {
+                            outlinePaint.color = android.graphics.Color.GRAY
+                            outlinePaint.strokeWidth = 3f
                             setPoints(path)
-                            color = android.graphics.Color.GRAY
-                            width = 3f
                         }
                         view.overlays.add(polyline)
                     }
@@ -154,9 +155,9 @@ fun MapScreen(
                     view.overlays.removeAll { it is Polyline }
 
                     val polyline = Polyline().apply {
+                        outlinePaint.color = android.graphics.Color.GREEN
+                        outlinePaint.strokeWidth = 5f
                         setPoints(currentPath)
-                        color = android.graphics.Color.GREEN
-                        width = 5f
                     }
                     view.overlays.add(polyline)
                 }
@@ -177,8 +178,8 @@ fun MapScreen(
             shape = MaterialTheme.shapes.medium
         ) {
             Icon(
-                imageVector = Icons.Default.MyLocation,
-                contentDescription = "Recentrer sur ma position"
+                imageVector = Icons.Default.LocationOn,
+                contentDescription = "Ma position"
             )
         }
 

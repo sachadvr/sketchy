@@ -41,7 +41,11 @@ fun Sidebar(
             )
         }
 
-        Divider()
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
+        )
 
         items.forEach { item ->
             NavigationDrawerItem(

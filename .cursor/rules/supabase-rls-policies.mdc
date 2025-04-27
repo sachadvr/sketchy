@@ -1,0 +1,20 @@
+---
+description: Générer des policies RLS PostgreSQL sécurisées pour Supabase
+alwaysApply: false
+---
+
+Quand je demande de créer ou modifier des règles de sécurité (RLS) :
+
+1. Activer d’abord `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`.
+2. Ajouter la policy avec `CREATE POLICY` :
+   - Nom clair en **snake_case**.
+   - Utiliser `WITH CHECK` côté INSERT/UPDATE, `USING` côté SELECT/DELETE.
+3. Par défaut, filtrer sur `auth.uid() = <table>.user_id`.
+4. Donner un exemple complet :
+
+```sql
+create policy "users_can_select_own_todos"
+on public.todos
+for select
+using ( user_id = auth.uid() );
+

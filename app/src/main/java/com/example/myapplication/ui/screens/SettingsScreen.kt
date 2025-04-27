@@ -35,9 +35,11 @@ fun SettingsScreen(
             
             OutlinedButton(
                 onClick = onLogout,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth(0.8f)
+                    .padding(horizontal = 16.dp)
             ) {
-                Text("Se déconnecter")
+                Text("Se déconnecter 1")
             }
 
             // Section Compte

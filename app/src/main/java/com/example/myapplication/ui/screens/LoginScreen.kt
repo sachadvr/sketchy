@@ -10,17 +10,19 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.example.myapplication.SupabaseManager
-import io.github.jan.supabase.gotrue.gotrue
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 
 /**
  * Écran de connexion (login) avec email et mot de passe
+ * @param supabaseClient instance de SupabaseClient
  * @param onLoginSuccess callback appelé lorsque la connexion réussit
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
+    supabaseClient: SupabaseClient,
     onLoginSuccess: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
@@ -70,14 +72,10 @@ fun LoginScreen(
                 isLoading = true
                 coroutineScope.launch {
                     try {
-                        // Appel à Supabase Auth
-                        SupabaseManager.client.gotrue.loginWith(
-                            provider = Email,
-                            config = {
-                                this.email = email
-                                this.password = password
-                            }
-                        )
+                        supabaseClient.auth.signInWith(Email) {
+                            email = email
+                            password = password
+                        }
                         withContext(Dispatchers.Main) {
                             onLoginSuccess()
                         }

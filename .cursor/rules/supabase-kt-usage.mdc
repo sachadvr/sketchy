@@ -1,0 +1,25 @@
+---
+description: Bonnes pratiques pour utiliser supabase-kt en Android
+globs: "**/supabase/**/*,**/*Supabase*.kt"
+alwaysApply: false
+---
+
+# Configuration
+
+- Gérer **l’URL du projet** et la **clé Anon** via `local.properties` + `BuildConfig`.
+- Initialiser Supabase une fois dans `SupabaseClientProvider` :
+  ```kotlin
+  object SupabaseClientProvider {
+      val client by lazy {
+          createSupabaseClient(
+              BuildConfig.SUPABASE_URL,
+              BuildConfig.SUPABASE_ANON
+          ) {
+              install(Postgrest)
+              install(Auth) {
+                  scheme = "supabase-demo"
+              }
+          }
+      }
+  }
+

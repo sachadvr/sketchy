@@ -30,10 +30,15 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import androidx.compose.runtime.*
 import com.example.myapplication.ui.components.AppContent
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import io.github.jan.supabase.SupabaseClient
 
-val supabase = SupabaseManager.client
-
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+
+    @Inject
+    lateinit var supabaseClient: SupabaseClient
 
     private var isRideActive by mutableStateOf(false)
     private var startTime by mutableStateOf(0L)
@@ -43,7 +48,6 @@ class MainActivity : AppCompatActivity() {
     private val LOCATION_PERMISSION_REQUEST = 100
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        SupabaseManager.init(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -52,13 +56,14 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeView).setContent {
             AppContent(
-                rideHistory   = rides,
-                onRideClick   = { ride -> showRideDetails(ride) },
-                onLogout      = { finish() },
+                supabaseClient = supabaseClient,
+                rideHistory = rides,
+                onRideClick = { ride -> showRideDetails(ride) },
+                onLogout = { finish() },
                 onDeleteAccount = { finish() },
-                onStartRide   = { location -> showStartRideConfirmation(location) },
-                onEndRide     = { showEndRideConfirmation() },
-                elapsedTime   = elapsedTime
+                onStartRide = { location -> showStartRideConfirmation(location) },
+                onEndRide = { showEndRideConfirmation() },
+                elapsedTime = elapsedTime
             )
         }
 
@@ -83,6 +88,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             MainScreen(
+                supabaseClient = supabaseClient,
                 isRideActive = isRideActive,
                 onStartRide = { location -> showStartRideConfirmation(location) },
                 onEndRide = { showEndRideConfirmation() },
@@ -231,7 +237,7 @@ class MainActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val skates = SupabaseManager.client.postgrest["skates"]
+                val skates = supabaseClient.postgrest["skates"]
                     .select()
                     .decodeList<Skate>()
 
@@ -250,7 +256,7 @@ class MainActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val result = SupabaseManager.client
+                val result = supabaseClient
                     .postgrest["subscription_plans"]
                     .select()
                     .decodeList<SubscriptionPlan>()

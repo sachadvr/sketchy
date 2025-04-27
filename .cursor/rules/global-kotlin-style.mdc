@@ -1,0 +1,30 @@
+---
+description: Règles de style et d’architecture Android Kotlin
+globs: "**/*.kt"
+alwaysApply: true
+---
+
+# Kotlin & Compose
+
+- Toujours écrire du **Kotlin moderne** :
+  - fonctions d’extension pour la lisibilité
+  - paramètres nommés
+  - `val` par défaut, `var` seulement si nécessaire
+- UI : préférer **Jetpack Compose**.  
+  - Les composables doivent être `@Composable`, sans état partagé, et documentés.
+  - Préfixer les fonctions non-composables d’UI par `build` si elles renvoient un composable.
+
+# Architecture
+
+- **MVVM + Hilt** :
+  - `ViewModel` = logique d’état (pas d’Android Context)
+  - `Repository` = appels réseau & Supabase
+  - Injecter les classes via Hilt (`@Inject` + `@HiltViewModel`)
+- Flow / StateFlow pour l’exécution asynchrone.
+- Toute fonction suspendue doit porter le suffixe `Async` si elle déclenche une I/O longue.
+
+# Tests
+
+- Chaque ViewModel possède un test unitaire isolé.
+- Utiliser `runTest` (kotlinx-coroutines-test) pour tester les flows.
+

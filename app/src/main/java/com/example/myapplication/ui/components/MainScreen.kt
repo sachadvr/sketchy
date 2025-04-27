@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -17,18 +18,16 @@ import com.example.myapplication.data.RideHistoryItem
 import com.example.myapplication.data.SubscriptionManager
 import com.example.myapplication.ui.screens.SubscriptionItem
 import com.example.myapplication.SubscriptionPlan
-import com.example.myapplication.SupabaseManager
 import com.example.myapplication.data.UserSubscription
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.gotrue.SessionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.coroutines.launch
-import io.github.jan.supabase.gotrue.gotrue
-import io.github.jan.supabase.gotrue.GoTrue
-
 
 sealed class Screen {
     object Map : Screen()
@@ -41,6 +40,7 @@ sealed class Screen {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
+    supabaseClient: SupabaseClient,
     isRideActive: Boolean,
     onStartRide: (GeoPoint) -> Unit,
     onEndRide: () -> Unit,
@@ -51,23 +51,35 @@ fun MainScreen(
     onRideClick: (RideHistoryItem) -> Unit,
     subscriptionPlans: List<SubscriptionPlan>
 ) {
-
-    var subscriptionPlans by remember { mutableStateOf<List<SubscriptionPlan>>(emptyList()) }
+    var currentSubscriptionPlans by remember { mutableStateOf<List<SubscriptionPlan>>(emptyList()) }
+    var isAuthenticated by remember { mutableStateOf(supabaseClient.auth.currentUserOrNull() != null) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        SupabaseManager.client
-            .postgrest["subscription_plans"]
-            .select()
-            .decodeList<SubscriptionPlan>()
-            .let { plans ->
-                subscriptionPlans = plans
-                Log.d("DEBUG", "MainScreen → abonnements : ${plans.size}")
+        supabaseClient.auth.sessionStatus.collect { status ->
+            isAuthenticated = when (status) {
+                is SessionStatus.Authenticated -> true
+                is SessionStatus.NotAuthenticated -> false
+                else -> false
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        try {
+            val plans = supabaseClient.postgrest["subscription_plans"]
+                .select()
+                .decodeList<SubscriptionPlan>()
+            currentSubscriptionPlans = plans
+            Log.d("DEBUG", "MainScreen → abonnements : ${plans.size}")
+        } catch (e: Exception) {
+            Log.e("DEBUG", "Erreur lors du chargement des abonnements", e)
+        }
     }
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Map) }
     var drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
 
     val subscriptionManager = remember { SubscriptionManager() }
     var currentSubscription by remember { mutableStateOf<SubscriptionItem?>(null) }
@@ -136,10 +148,13 @@ fun MainScreen(
                 )
             }
         ) { paddingValues ->
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
                 when (currentScreen) {
                     Screen.Map -> MapScreen(
@@ -153,13 +168,13 @@ fun MainScreen(
                         onRideClick = onRideClick
                     )
                     Screen.Subscriptions -> {
-                        val subscriptionItems = subscriptionPlans.map {
+                        val subscriptionItems = currentSubscriptionPlans.map {
                             SubscriptionItem(
                                 id = it.id,
                                 name = it.name,
                                 description = it.description ?: "",
                                 price = it.price,
-                                type =it.type,
+                                type = it.type,
                                 period = it.period,
                                 features = it.features
                             )
@@ -167,13 +182,15 @@ fun MainScreen(
                         SubscriptionsScreen(
                             subscriptions = subscriptionItems,
                             currentSubscription = currentSubscription,
-                            onSubscribe = fun(subscription: SubscriptionItem) {
-                                val userId = SupabaseManager.client.gotrue.currentUserOrNull()?.id
-                                val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+                            onSubscribe = { subscription ->
+                                val userId = supabaseClient.auth.currentUserOrNull()?.id
+                                val today = Clock.System.now()
+                                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                                    .date.toString()
 
                                 if (userId == null) {
                                     Log.e("SUB", "❌ Impossible de récupérer l'ID utilisateur")
-                                    return
+                                    return@SubscriptionsScreen
                                 }
 
                                 val newSub = UserSubscription(
@@ -184,7 +201,7 @@ fun MainScreen(
 
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        SupabaseManager.client.postgrest["user_subscriptions"]
+                                        supabaseClient.postgrest["user_subscriptions"]
                                             .insert(newSub)
                                         Log.d("SUB", "✅ Abonnement enregistré !")
                                     } catch (e: Exception) {
@@ -192,7 +209,6 @@ fun MainScreen(
                                     }
                                 }
                             }
-
                         )
                     }
                     Screen.Profile -> ProfileScreen(
@@ -210,7 +226,41 @@ fun MainScreen(
                         onDeleteAccount = onDeleteAccount
                     )
                 }
+                
+                // Bouton de déconnexion
+                OutlinedButton(
+                    onClick = { showLogoutDialog = true },
+                    modifier = Modifier.width(200.dp)
+                ) {
+                    Text("Se déconnecter")
+                }
             }
         }
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Déconnexion") },
+            text = { Text("Voulez-vous vraiment vous déconnecter ?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                        scope.launch {
+                            supabaseClient.auth.signOut()
+                            onLogout()
+                        }
+                    }
+                ) {
+                    Text("Oui")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Non")
+                }
+            }
+        )
     }
 }
