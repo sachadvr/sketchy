@@ -7,8 +7,10 @@ import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.gotrue.auth
+import com.example.myapplication.data.model.SupabaseJson
 import javax.inject.Inject
 import javax.inject.Singleton
+import io.github.jan.supabase.serializer.KotlinXSerializer
 
 @Singleton
 class SupabaseClientProvider @Inject constructor(
@@ -20,15 +22,20 @@ class SupabaseClientProvider @Inject constructor(
         if (client == null) {
             client = createSupabaseClient(
                 supabaseUrl = Config.SUPABASE_URL,
-                supabaseKey = Config.SUPABASE_ANON_KEY
+                supabaseKey = Config.SUPABASE_ANON_KEY,
             ) {
                 install(Auth) {
-                    // Configuration pour les redirections OAuth
+                    
                     scheme = "app"
                     host = "supabase.com"
+                    serializer = KotlinXSerializer(SupabaseJson)
                 }
-                install(Postgrest)
-                install(Realtime)
+                install(Postgrest) {
+                    serializer = KotlinXSerializer(SupabaseJson)
+                }
+                install(Realtime) {
+                    serializer = KotlinXSerializer(SupabaseJson)
+                }
             }
         }
         return client!!

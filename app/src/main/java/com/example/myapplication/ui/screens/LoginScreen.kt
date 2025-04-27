@@ -1,12 +1,12 @@
 package com.example.myapplication.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -19,12 +19,6 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 
-/**
- * Écran de connexion (login) avec email et mot de passe
- * @param supabaseClient instance de SupabaseClient
- * @param onLoginSuccess callback appelé lorsque la connexion réussit
- * @param onRegisterClick callback appelé lorsque l'utilisateur veut créer un compte
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -42,7 +36,7 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF663399)) // Fond violet
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -51,27 +45,27 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Logo ou texte "Sketchy"
+            
             Text(
                 text = "Sketchy",
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 60.sp
                 ),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 48.dp)
             )
 
-            // Card contenant le formulaire de connexion
+            
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
                 Column(
@@ -83,7 +77,7 @@ fun LoginScreen(
                     Text(
                         text = "Connexion",
                         style = MaterialTheme.typography.headlineMedium,
-                        color = Color(0xFF663399),
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
 
@@ -114,14 +108,28 @@ fun LoginScreen(
                             isLoading = true
                             coroutineScope.launch {
                                 try {
+                                    Log.d("AUTH_DEBUG", "Tentative de connexion avec email: $email")
+                                    
                                     supabaseClient.auth.signInWith(Email) {
-                                        email = email
-                                        password = password
+                                        this.email = email
+                                        this.password = password
                                     }
-                                    withContext(Dispatchers.Main) {
-                                        onLoginSuccess()
+                                    
+                                    
+                                    val user = supabaseClient.auth.currentUserOrNull()
+                                    if (user != null) {
+                                        Log.d("AUTH_DEBUG", "Connexion réussie. User ID: ${user.id}")
+                                        withContext(Dispatchers.Main) {
+                                            onLoginSuccess()
+                                        }
+                                    } else {
+                                        Log.e("AUTH_DEBUG", "Utilisateur non connecté après signInWith")
+                                        withContext(Dispatchers.Main) {
+                                            errorMessage = "Erreur lors de la connexion: l'utilisateur n'a pas été connecté"
+                                        }
                                     }
                                 } catch (e: Exception) {
+                                    Log.e("AUTH_DEBUG", "Erreur lors de la connexion", e)
                                     withContext(Dispatchers.Main) {
                                         errorMessage = e.message ?: "Erreur lors de la connexion"
                                     }
@@ -135,14 +143,14 @@ fun LoginScreen(
                         enabled = !isLoading,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF663399)
+                            containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
                                 strokeWidth = 2.dp,
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
                         } else {
                             Text("Se connecter")
@@ -164,7 +172,7 @@ fun LoginScreen(
                         onClick = onRegisterClick,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF663399)
+                            contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Text("Créer un compte")

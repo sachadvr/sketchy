@@ -1,12 +1,12 @@
 package com.example.myapplication.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -19,12 +19,6 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 
-/**
- * Écran d'inscription (register) avec email et mot de passe
- * @param supabaseClient instance de SupabaseClient
- * @param onRegisterSuccess callback appelé lorsque l'inscription réussit
- * @param onLoginClick callback appelé lorsque l'utilisateur veut retourner à l'écran de connexion
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
@@ -38,12 +32,11 @@ fun RegisterScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
-    val primaryColor = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF663399)) // Fond violet
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -52,27 +45,26 @@ fun RegisterScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Logo ou texte "Sketchy"
             Text(
                 text = "Sketchy",
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 60.sp
                 ),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 48.dp)
             )
 
-            // Card contenant le formulaire d'inscription
+            
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
                 Column(
@@ -84,7 +76,7 @@ fun RegisterScreen(
                     Text(
                         text = "Inscription",
                         style = MaterialTheme.typography.headlineMedium,
-                        color = Color(0xFF663399),
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
 
@@ -122,43 +114,40 @@ fun RegisterScreen(
 
                     Button(
                         onClick = {
-                            if (password != confirmPassword) {
-                                errorMessage = "Les mots de passe ne correspondent pas"
-                                return@Button
-                            }
-                            errorMessage = null
-                            isLoading = true
                             coroutineScope.launch {
-                                try {
-                                    supabaseClient.auth.signUpWith(Email) {
-                                        email = email
-                                        password = password
-                                    }
-                                    withContext(Dispatchers.Main) {
-                                        onRegisterSuccess()
-                                    }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        errorMessage = e.message ?: "Erreur lors de l'inscription"
-                                    }
-                                } finally {
-                                    withContext(Dispatchers.Main) {
-                                        isLoading = false
-                                    }
+                                isLoading = true
+                                errorMessage = null
+                                if (password != confirmPassword) {
+                                    errorMessage = "Les mots de passe ne correspondent pas."
+                                    isLoading = false
+                                    return@launch
                                 }
+                                try {
+                                    val result = withContext(Dispatchers.IO) {
+                                        supabaseClient.auth.signUpWith(Email) {
+                                            email = email
+                                            password = password
+                                        }
+                                    }
+                                    Log.d("RegisterScreen", "Résultat inscription: $result")
+                                    onRegisterSuccess()
+                                } catch (e: Exception) {
+                                    Log.e("RegisterScreen", "Erreur lors de l'inscription", e)
+                                    errorMessage = e.message ?: "Erreur lors de l'inscription."
+                                }
+                                isLoading = false
                             }
                         },
-                        enabled = !isLoading,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF663399)
+                            containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
                                 strokeWidth = 2.dp,
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
                         } else {
                             Text("S'inscrire")
@@ -180,7 +169,7 @@ fun RegisterScreen(
                         onClick = onLoginClick,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF663399)
+                            contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Text("Déjà un compte ? Se connecter")

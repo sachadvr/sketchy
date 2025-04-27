@@ -8,14 +8,13 @@ data class SubscriptionPlan(
     val name: String,
     val description: String,
     val pricePerMonth: Double,
-    val features: List<String>,
-    val maxRidesPerMonth: Int? = null,
-    val discountPercentage: Int = 0,
-    val type: SubscriptionType = SubscriptionType.BASIC
+    val type: SubscriptionType,
+    val features: List<String> = emptyList(),
+    val maxRidesPerMonth: Int = 0,
+    val discountPercentage: Int = 0
 )
 
+@Serializable
 enum class SubscriptionType {
-    BASIC,
-    PREMIUM,
-    UNLIMITED
+    BASIC, PREMIUM, UNLIMITED
 } 

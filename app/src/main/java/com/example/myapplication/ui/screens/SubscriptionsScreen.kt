@@ -49,10 +49,10 @@ fun SubscriptionCard(
     onSubscribe: () -> Unit
 ) {
     val typeColor = when (subscription.type) {
-        "Premium" -> Color(0xFFFFD700)
-        "Standard" -> Color(0xFF4CAF50)
-        "Basique" -> Color(0xFF2196F3)
-        else -> Color.Gray
+        "Premium" -> MaterialTheme.colorScheme.secondary
+        "Standard" -> MaterialTheme.colorScheme.tertiary
+        "Basique" -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Card(
@@ -91,7 +91,7 @@ fun SubscriptionCard(
             Button(
                 onClick = onSubscribe,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isSubscribed  // Désactiver le bouton si déjà abonné
+                enabled = !isSubscribed  
             ) {
                 Text(if (isSubscribed) "Abonnement actif" else "S'abonner")
             }

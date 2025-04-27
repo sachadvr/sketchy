@@ -5,12 +5,23 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Skate(
     val id: String,
+    val serial_number: String,
     val model: String,
-    val batteryLevel: Int,
-    val disponible: Boolean = true,
-    val coordonnees: Map<String, Double>? = null,
-    val lastMaintenance: Long? = null,
-    val status: SkateStatus = SkateStatus.AVAILABLE
+    val status: String,
+    val coordinates: Coordinates? = null,
+    val created_at: String? = null
+)
+
+@Serializable
+data class Coordinates(
+    val latitude: Double,
+    val longitude: Double
+)
+
+@Serializable
+data class CoordinatesDto(
+    val latitude: Double,
+    val longitude: Double
 )
 
 enum class SkateStatus {

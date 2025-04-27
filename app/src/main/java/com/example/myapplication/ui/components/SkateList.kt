@@ -9,6 +9,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.model.Skate
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun SkateList(
@@ -46,31 +51,53 @@ private fun SkateItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        color = when (skate.status) {
+                            "AVAILABLE" -> MaterialTheme.colorScheme.primary
+                            "IN_USE" -> MaterialTheme.colorScheme.error
+                            "MAINTENANCE" -> MaterialTheme.colorScheme.secondary
+                            "OUT_OF_SERVICE" -> MaterialTheme.colorScheme.outline
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Color.White
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = skate.model,
+                    text = "Skate #${skate.id}",
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = "Batterie: ${skate.batteryLevel}%",
+                    text = "Modèle: ${skate.model}",
                     style = MaterialTheme.typography.bodyMedium
                 )
-            }
-
-            if (skate.disponible) {
                 Text(
-                    text = "Disponible",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium
-                )
-            } else {
-                Text(
-                    text = "Indisponible",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.labelMedium
+                    text = "Status: ${skate.status}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when (skate.status) {
+                        "AVAILABLE" -> MaterialTheme.colorScheme.primary
+                        "IN_USE" -> MaterialTheme.colorScheme.error
+                        "MAINTENANCE" -> MaterialTheme.colorScheme.secondary
+                        "OUT_OF_SERVICE" -> MaterialTheme.colorScheme.outline
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
         }

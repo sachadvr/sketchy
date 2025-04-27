@@ -59,7 +59,7 @@ fun SubscriptionCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Avantages de l'abonnement
+            
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)

@@ -6,13 +6,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.myapplication.ui.viewmodels.ThemeViewModel
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit,
-    onDeleteAccount: () -> Unit
+    onDeleteAccount: () -> Unit,
+    themeViewModel: ThemeViewModel = hiltViewModel()
 ) {
+    val isDarkMode by themeViewModel.isDarkMode.collectAsState()
+    
+    
+    LaunchedEffect(isDarkMode) {
+        Log.d("SettingsScreen", "Mode sombre actuel: $isDarkMode")
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -27,7 +38,7 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Section Profil
+            
             Text(
                 text = "Profil",
                 style = MaterialTheme.typography.titleLarge
@@ -39,10 +50,10 @@ fun SettingsScreen(
                     .fillMaxWidth(0.8f)
                     .padding(horizontal = 16.dp)
             ) {
-                Text("Se déconnecter 1")
+                Text("Se déconnecter")
             }
 
-            // Section Compte
+            
             Text(
                 text = "Compte",
                 style = MaterialTheme.typography.titleLarge
@@ -58,42 +69,37 @@ fun SettingsScreen(
                 Text("Supprimer le compte")
             }
 
-            // Section Notifications
-            Text(
-                text = "Notifications",
-                style = MaterialTheme.typography.titleLarge
-            )
-            
-            var notificationsEnabled by remember { mutableStateOf(true) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Activer les notifications")
-                Switch(
-                    checked = notificationsEnabled,
-                    onCheckedChange = { notificationsEnabled = it }
-                )
-            }
-
             Text(
                 text = "Apparence",
                 style = MaterialTheme.typography.titleLarge
             )
             
-            var darkModeEnabled by remember { mutableStateOf(false) }
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Mode sombre")
+                Text(
+                    text = "Mode sombre",
+                    style = MaterialTheme.typography.bodyLarge
+                )
                 Switch(
-                    checked = darkModeEnabled,
-                    onCheckedChange = { darkModeEnabled = it }
+                    checked = isDarkMode,
+                    onCheckedChange = { 
+                        Log.d("SettingsScreen", "Switch toggled, nouvelle valeur: ${!isDarkMode}")
+                        themeViewModel.toggleDarkMode() 
+                    }
                 )
             }
+            
+            
+            Text(
+                text = "Statut actuel: ${if (isDarkMode) "Mode sombre activé" else "Mode clair activé"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
         }
     }
 } 

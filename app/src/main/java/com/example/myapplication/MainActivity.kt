@@ -4,21 +4,19 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.PricingCalculator
-import com.example.myapplication.data.RideHistory
-import com.example.myapplication.data.RideHistoryItem
+import com.example.myapplication.data.model.RideHistoryItem
 import com.example.myapplication.ui.components.MainScreen
 import org.osmdroid.util.GeoPoint
 import java.util.*
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.res.ResourcesCompat
@@ -36,203 +34,126 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import io.github.jan.supabase.SupabaseClient
 import com.example.myapplication.data.model.SubscriptionPlan
-import com.example.myapplication.data.model.SubscriptionType
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
+import com.example.myapplication.data.repository.RideRepository
+import androidx.compose.runtime.collectAsState
+import com.example.myapplication.ui.viewmodel.MainViewModel
+import androidx.activity.viewModels
+import com.example.myapplication.data.model.GeoPointSerializable
+import android.widget.Toast
+import com.example.myapplication.ui.theme.AppTheme
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.data.model.Skate
+import com.example.myapplication.data.model.Coordinates
+import com.example.myapplication.data.repository.SkateDto
+import com.example.myapplication.data.repository.toSkate
+import com.example.myapplication.data.model.SubscriptionPlanDto
+import com.example.myapplication.data.model.toSubscriptionPlan
 import com.example.myapplication.ui.screens.LoginScreen
 import com.example.myapplication.ui.screens.RegisterScreen
-import com.example.myapplication.ui.screens.HomeScreen
+import io.github.jan.supabase.gotrue.SessionStatus
 
 @AndroidEntryPoint
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var supabaseClient: SupabaseClient
+    
+    @Inject
+    lateinit var rideRepository: RideRepository
+    
+    private val viewModel: MainViewModel by viewModels()
 
     private var isRideActive by mutableStateOf(false)
     private var startTime by mutableStateOf(0L)
     private var elapsedTime by mutableStateOf(0L)
     private var currentPath by mutableStateOf(listOf<GeoPoint>())
-    private val rideHistory = RideHistory()
+    private val rideHistory = mutableListOf<RideHistoryItem>()
     private val LOCATION_PERMISSION_REQUEST = 100
+    
+    private val timerRunnable = object : Runnable {
+        override fun run() {
+            if (isRideActive) {
+                elapsedTime = SystemClock.elapsedRealtime() - startTime
+                mainHandler.postDelayed(this, 1000)
+            }
+        }
+    }
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        // Demande des permissions de localisation
+        requestLocationPermission()
+
+        setContent {
+            LaunchedEffect(Unit) {
+                val user = supabaseClient.auth.currentUserOrNull()
+                Log.d("AUTH_DEBUG", "User actuel: ${user?.email ?: "Non connecté"}")
+                Log.d("AUTH_DEBUG", "User ID: ${user?.id ?: "Aucun ID"}")
+                Log.d("AUTH_DEBUG", "Session valide: ${user != null}")
+            }
+            
+            
+            val uiState by viewModel.uiState.collectAsState()
+            
+            AppTheme {
+                AppNavigation(
+                    supabaseClient = supabaseClient,
+                    isRideActive = uiState.currentRide != null,
+                    elapsedTime = if (uiState.currentRide != null) {
+                        val ride = uiState.currentRide!!
+                        System.currentTimeMillis() - ride.startTime
+                    } else {
+                        0L
+                    },
+                    onStartRide = { location ->
+                        Log.d("MainActivity", "StartRide appelé avec location $location")
+                        viewModel.startRide("selected_skate", location)
+                    },
+                    onEndRide = {
+                        viewModel.endRide()
+                    },
+                    onLogout = {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            supabaseClient.auth.signOut()
+                        }
+                    },
+                    onDeleteAccount = {
+                        showDeleteAccountConfirmation()
+                    },
+                    rideHistory = uiState.rideHistory,
+                    onRideClick = ::showRideDetails,
+                    subscriptionPlans = uiState.subscriptionPlans
+                )
+            }
+        }
+    }
+
+    private fun requestLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                 LOCATION_PERMISSION_REQUEST)
         }
-
-        // Configuration de l'interface utilisateur avec Compose
-        findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeView).setContent {
-            // Variables pour stocker les données
-            var subscriptionPlans by remember { mutableStateOf(listOf<SubscriptionPlan>()) }
-            val rides: List<RideHistoryItem> = rideHistory.getRides()
-
-            // Chargement des plans d'abonnement
-            LaunchedEffect(Unit) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val plans = supabaseClient.postgrest["subscription_plans"]
-                            .select()
-                            .decodeList<SubscriptionPlan>()
-                        subscriptionPlans = plans
-                    } catch (e: Exception) {
-                        Log.e("SUPABASE", "Erreur lors du chargement des abonnements: ${e.message}", e)
-                    }
-                }
-            }
-
-            // Affichage du contenu principal de l'application
-            AppContent(
-                supabaseClient = supabaseClient,
-                rideHistory = rides,
-                onRideClick = { ride -> showRideDetails(ride) },
-                onLogout = { 
-                    // Déconnexion de l'utilisateur
-                    CoroutineScope(Dispatchers.IO).launch {
-                        try {
-                            supabaseClient.auth.signOut()
-                        } catch (e: Exception) {
-                            Log.e("SUPABASE", "Erreur lors de la déconnexion: ${e.message}", e)
-                        }
-                    }
-                },
-                onDeleteAccount = {
-                    // Supprimer le compte utilisateur
-                    AlertDialog.Builder(this)
-                        .setTitle("Supprimer le compte")
-                        .setMessage("Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.")
-                        .setPositiveButton("Oui") { _, _ ->
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    // Supabase ne fournit pas de méthode deleteUser, utilisons signOut
-                                    supabaseClient.auth.signOut()
-                                    runOnUiThread {
-                                        // Informer l'utilisateur
-                                        AlertDialog.Builder(this@MainActivity)
-                                            .setTitle("Compte déconnecté")
-                                            .setMessage("Vous avez été déconnecté. Pour supprimer complètement votre compte, veuillez contacter le support.")
-                                            .setPositiveButton("OK", null)
-                                            .show()
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("SUPABASE", "Erreur lors de la suppression du compte: ${e.message}", e)
-                                }
-                            }
-                        }
-                        .setNegativeButton("Non", null)
-                        .show()
-                },
-                onStartRide = { location -> showStartRideConfirmation(location) },
-                onEndRide = { showEndRideConfirmation() },
-                elapsedTime = elapsedTime
-            )
-        }
-
-        // Démarrage du thread de suivi du temps
-        startTimeTrackingThread()
     }
 
-    private fun startTimeTrackingThread() {
-        Thread {
-            while (true) {
-                if (isRideActive) {
-                    elapsedTime = SystemClock.elapsedRealtime() - startTime
-                    // Ici, vous pourriez ajouter la position actuelle au chemin
-                    // currentPath = currentPath + currentLocation
-                }
-                Thread.sleep(1000)
-            }
-        }.start()
-    }
-
-    private fun showStartRideConfirmation(location: GeoPoint) {
-        AlertDialog.Builder(this)
-            .setTitle("Confirmation de location")
-            .setMessage("Voulez-vous commencer la location du skateboard à cet endroit ?")
-            .setPositiveButton("Oui") { _, _ ->
-                startRide(location)
-            }
-            .setNegativeButton("Non", null)
-            .show()
-    }
-
-    private fun startRide(location: GeoPoint) {
-        isRideActive = true
-        startTime = SystemClock.elapsedRealtime()
-        currentPath = listOf(location)
-    }
-
-    private fun showEndRideConfirmation() {
-        AlertDialog.Builder(this)
-            .setTitle("Fin de la course")
-            .setMessage("Voulez-vous vraiment terminer la course ?")
-            .setPositiveButton("Oui") { _, _ ->
-                endRide()
-            }
-            .setNegativeButton("Non", null)
-            .show()
-    }
-
-    private fun endRide() {
-        isRideActive = false
-        val minutes = elapsedTime / 60000f
-        val price = PricingCalculator.calculatePrice(minutes.toInt())
-        
-        // Créer un nouvel élément d'historique
-        val ride = RideHistoryItem(
-            id = UUID.randomUUID().toString(),
-            date = Date(),
-            distance = calculateDistance(currentPath),
-            duration = elapsedTime,
-            price = price,
-            path = currentPath
-        )
-        
-        // Ajouter à l'historique
-        rideHistory.addRide(ride)
-        
-        AlertDialog.Builder(this)
-            .setTitle("Course terminée (${PricingCalculator.formatPrice(price)})")
-            .setMessage("Durée de la course : ${String.format("%.1f", minutes)} minutes")
-            .setPositiveButton("OK", null)
-            .show()
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     private fun showRideDetails(ride: RideHistoryItem) {
-        val minutes = ride.duration / 60000f
+        val endTimeMs = ride.endTime ?: System.currentTimeMillis()
+        val minutes = (endTimeMs - ride.startTime) / 60000f
         AlertDialog.Builder(this)
             .setTitle("Détails de la course")
             .setMessage("""
-                Date: ${String.format("%tF %<tT", ride.date)}
+                Date: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(ride.startTime))}
                 Distance: ${String.format("%.2f", ride.distance)} km
                 Durée: ${String.format("%.1f", minutes)} minutes
-                Prix: ${ride.price}€
+                Prix: ${String.format("%.2f", ride.price)}€
             """.trimIndent())
             .setPositiveButton("OK", null)
             .show()
@@ -245,7 +166,7 @@ class MainActivity : AppCompatActivity() {
         for (i in 1 until path.size) {
             totalDistance += path[i].distanceToAsDouble(path[i - 1])
         }
-        return totalDistance / 1000.0 // Conversion en kilomètres
+        return totalDistance / 1000.0 
     }
 
     override fun onRequestPermissionsResult(
@@ -256,33 +177,25 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == LOCATION_PERMISSION_REQUEST) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission accordée
+                println("Autorisé");
             }
         }
     }
 
     private fun afficherSkatesSurCarte(skates: List<Skate>, mapView: MapView) {
         skates.forEach { skate ->
-            val coords = skate.coordonnees
-            if (coords != null) {
-                val lat = coords["lat"]
-                val lon = coords["lon"]
+            val coords = skate.coordinates ?: Coordinates(50.62925, 3.057256)
+            val point = GeoPoint(coords.latitude, coords.longitude)
+            val marker = Marker(mapView)
+            marker.position = point
+            marker.title = "Skate #${skate.id}"
+            marker.snippet = "Modèle: ${skate.model}"
+            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
-                if (lat != null && lon != null) {
-                    val point = GeoPoint(lat, lon)
-                    val marker = Marker(mapView)
-                    marker.position = point
-                    marker.title = skate.model
-                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            marker.icon = ResourcesCompat.getDrawable(resources, R.drawable.skate, null)
 
-                    // Utiliser l'icône du skate
-                    marker.icon = ResourcesCompat.getDrawable(resources, R.drawable.skate, null)
-
-                    mapView.overlays.add(marker)
-                }
-            }
+            mapView.overlays.add(marker)
         }
-        // Centrer la carte sur Lille
         mapView.controller.setCenter(GeoPoint(50.62925, 3.057256))
         mapView.controller.setZoom(15.0)
     }
@@ -290,9 +203,14 @@ class MainActivity : AppCompatActivity() {
     fun testFetchSkates(mapView: MapView) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val skates = supabaseClient.postgrest["skates"]
+                val skatesDto = supabaseClient.postgrest["skates"]
                     .select()
-                    .decodeList<Skate>()
+                    .decodeList<SkateDto>()
+                
+                
+                val skates = skatesDto.map { dto -> 
+                    dto.toSkate()
+                }
 
                 this@MainActivity.runOnUiThread {
                     afficherSkatesSurCarte(skates, mapView)
@@ -309,31 +227,19 @@ class MainActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // On récupère d'abord les données Supabase dans une structure temporaire
+                
                 val supabasePlans = supabaseClient
                     .postgrest["subscription_plans"]
                     .select()
                     .decodeList<SubscriptionPlanDto>()
                 
-                // Puis on les convertit vers notre modèle local
                 val plans = supabasePlans.map { dto ->
-                    SubscriptionPlan(
-                        id = dto.id,
-                        name = dto.name,
-                        description = dto.description ?: "",
-                        pricePerMonth = dto.price,
-                        features = dto.features,
-                        type = when (dto.type.uppercase()) {
-                            "PREMIUM" -> SubscriptionType.PREMIUM
-                            "UNLIMITED" -> SubscriptionType.UNLIMITED
-                            else -> SubscriptionType.BASIC
-                        }
-                    )
+                    dto.toSubscriptionPlan()
                 }
 
                 Log.d("DEBUG", "Taille totale reçue : ${plans.size}")
-                plans.forEach {
-                    Log.d("DEBUG", "📦 ${it.name} - ${it.pricePerMonth}€ - ${it.type}")
+                plans.forEach { plan ->
+                    Log.d("DEBUG", "📦 ${plan.name} - ${plan.pricePerMonth}€ - ${plan.type}")
                 }
 
                 runOnUiThread {
@@ -345,30 +251,40 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun showDeleteAccountConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Supprimer votre compte")
+            .setMessage("Êtes-vous sûr de vouloir supprimer votre compte? Cette action est irréversible.")
+            .setPositiveButton("Supprimer") { _, _ ->
+                deleteAccount()
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    private fun deleteAccount() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val userRepository = com.example.myapplication.data.repository.UserRepository(supabaseClient)
+                val success = userRepository.deleteAccount()
+                
+                runOnUiThread {
+                    if (success) {
+                        Toast.makeText(this@MainActivity, "Compte supprimé avec succès", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(this@MainActivity, "Erreur lors de la suppression du compte", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Erreur lors de la suppression du compte", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Erreur: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 }
-
-@Serializable
-data class Skate(
-    val id: String,
-    val serial_number: String,
-    val model: String,
-    val status: String,
-    val created_at: String,
-    val coordonnees: Map<String, Double>? = null
-)
-
-// Modèle pour la désérialisation des données de Supabase
-@Serializable
-data class SubscriptionPlanDto(
-    val id: String,
-    val name: String,
-    val description: String?,
-    val price: Double,
-    val period: String,
-    val type: String,
-    val features: List<String>,
-    val created_at: String
-)
 
 data class SubscriptionItem(
     val id: String,
@@ -381,15 +297,40 @@ data class SubscriptionItem(
 )
 
 @Composable
-fun AppNavigation(supabaseClient: SupabaseClient) {
+fun AppNavigation(
+    supabaseClient: SupabaseClient,
+    isRideActive: Boolean,
+    elapsedTime: Long,
+    onStartRide: (GeoPoint) -> Unit,
+    onEndRide: () -> Unit,
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    rideHistory: List<com.example.myapplication.data.model.RideHistoryItem>,
+    onRideClick: (com.example.myapplication.data.model.RideHistoryItem) -> Unit,
+    subscriptionPlans: List<SubscriptionPlan>
+) {
     val navController = rememberNavController()
     
-    NavHost(navController = navController, startDestination = "login") {
+    val isAuthenticated = remember {
+        mutableStateOf(supabaseClient.auth.currentUserOrNull() != null)
+    }
+    
+    LaunchedEffect(Unit) {
+        supabaseClient.auth.sessionStatus.collect { status ->
+            isAuthenticated.value = status is SessionStatus.Authenticated
+            Log.d("AUTH_DEBUG", "Changement d'état de session: $status")
+        }
+    }
+    
+    val startDestination = if (isAuthenticated.value) "main" else "login"
+    
+    NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(
                 supabaseClient = supabaseClient,
                 onLoginSuccess = {
-                    navController.navigate("home") {
+                    Log.d("AUTH_DEBUG", "Login réussi, navigation vers main")
+                    navController.navigate("main") {
                         popUpTo("login") { inclusive = true }
                     }
                 },
@@ -403,6 +344,7 @@ fun AppNavigation(supabaseClient: SupabaseClient) {
             RegisterScreen(
                 supabaseClient = supabaseClient,
                 onRegisterSuccess = {
+                    Log.d("AUTH_DEBUG", "Inscription réussie, navigation vers login")
                     navController.navigate("login")
                 },
                 onLoginClick = {
@@ -410,17 +352,42 @@ fun AppNavigation(supabaseClient: SupabaseClient) {
                 }
             )
         }
-        
-        composable("home") {
-            HomeScreen(
+
+        composable("main") {
+            MainScreen(
                 supabaseClient = supabaseClient,
-                onLogout = {
-                    navController.navigate("login") {
-                        popUpTo("home") { inclusive = true }
-                    }
-                }
+                isRideActive = isRideActive,
+                onStartRide = onStartRide,
+                onEndRide = onEndRide,
+                elapsedTime = elapsedTime,
+                onLogout = onLogout,
+                onDeleteAccount = onDeleteAccount,
+                rideHistory = rideHistory,
+                onRideClick = onRideClick,
+                subscriptionPlans = subscriptionPlans
             )
         }
     }
 }
+
+@Serializable
+data class LocationPoint(
+    val lat: Double,
+    val lon: Double
+)
+
+@Serializable
+data class RideData(
+    val id: String,
+    val user_id: String?,
+    val start_time: Long,
+    val end_time: Long?,
+    val distance: Double,
+    val duration: Long,
+    val price: Double,
+    val start_location: LocationPoint,
+    val end_location: LocationPoint,
+    val path: List<LocationPoint>,
+    val created_at: Long
+)
 

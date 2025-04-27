@@ -10,20 +10,24 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.SessionStatus
 import org.osmdroid.util.GeoPoint
-import com.example.myapplication.data.RideHistoryItem
+import com.example.myapplication.data.model.RideHistoryItem
+import com.example.myapplication.data.model.SubscriptionPlan
 import com.example.myapplication.ui.screens.LoginScreen
 import com.example.myapplication.ui.screens.RegisterScreen
 
 @Composable
 fun AppContent(
     supabaseClient: SupabaseClient,
-    rideHistory: List<RideHistoryItem>,
-    onRideClick: (RideHistoryItem) -> Unit,
+    isLoggedIn: Boolean,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
-    onStartRide: (GeoPoint) -> Unit,
-    onEndRide: () -> Unit,
-    elapsedTime: Long
+    isRideActive: Boolean = false,
+    elapsedTime: Long = 0,
+    onStartRide: (GeoPoint) -> Unit = {},
+    onEndRide: () -> Unit = {},
+    rideHistory: List<com.example.myapplication.data.model.RideHistoryItem> = emptyList(),
+    onRideClick: (com.example.myapplication.data.model.RideHistoryItem) -> Unit = {},
+    subscriptionPlans: List<SubscriptionPlan> = emptyList()
 ) {
     var showRegister by remember { mutableStateOf(false) }
     var isAuthenticated by remember { mutableStateOf(supabaseClient.auth.currentUserOrNull() != null) }
@@ -41,7 +45,7 @@ fun AppContent(
     val user = supabaseClient.auth.currentUserOrNull()
 
     when {
-        // 1️⃣ pas de user et on est en mode login
+        
         user == null && !showRegister -> Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -51,7 +55,6 @@ fun AppContent(
             LoginScreen(
                 supabaseClient = supabaseClient,
                 onLoginSuccess = {
-                    /* après login, Compose recomposera automatiquement AppContent */
                 }
             )
             Spacer(Modifier.height(8.dp))
@@ -60,7 +63,6 @@ fun AppContent(
             }
         }
 
-        // 2️⃣ pas de user et on est en mode register
         user == null && showRegister -> Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -71,7 +73,8 @@ fun AppContent(
                 supabaseClient = supabaseClient,
                 onRegisterSuccess = {
                     showRegister = false
-                }
+                },
+                onLoginClick = { showRegister = false }
             )
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = { showRegister = false }) {
@@ -79,10 +82,9 @@ fun AppContent(
             }
         }
 
-        // 3️⃣ user connecté -> on affiche MainScreen
         else -> MainScreen(
             supabaseClient = supabaseClient,
-            isRideActive = false,
+            isRideActive = elapsedTime > 0, // considérer qu'une course est active si le temps est supérieur à 0
             onStartRide = onStartRide,
             onEndRide = onEndRide,
             elapsedTime = elapsedTime,

@@ -1,5 +1,7 @@
 package com.example.myapplication.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,35 +9,56 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.PricingCalculator
+import com.example.myapplication.data.model.RideHistoryItem
 import java.text.SimpleDateFormat
 import java.util.*
-import org.osmdroid.util.GeoPoint
-import com.example.myapplication.data.RideHistoryItem
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     rides: List<RideHistoryItem>,
     onRideClick: (RideHistoryItem) -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Historique des courses") }
-            )
-        }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            items(rides) { ride ->
-                RideHistoryCard(
-                    ride = ride,
-                    onClick = { onRideClick(ride) }
+    val locale = Locale.getDefault()
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", locale) }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Historique des courses",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        
+        if (rides.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Aucune course effectuée",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
                 )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(rides) { ride ->
+                    RideHistoryCard(
+                        ride = ride,
+                        dateFormat = dateFormat,
+                        onClick = { onRideClick(ride) }
+                    )
+                }
             }
         }
     }
@@ -43,46 +66,57 @@ fun HistoryScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RideHistoryCard(
+private fun RideHistoryCard(
     ride: RideHistoryItem,
+    dateFormat: SimpleDateFormat,
     onClick: () -> Unit
 ) {
     Card(
-        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
                 .fillMaxWidth()
+                .padding(16.dp)
         ) {
-            Text(
-                text = formatDate(ride.date),
-                style = MaterialTheme.typography.titleMedium
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = dateFormat.format(Date(ride.startTime)),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = PricingCalculator.formatPrice(ride.price),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Distance: ${ride.distance}km",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = "Durée: ${formatDuration(ride.duration)}",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                val durationMs = ride.endTime?.let { it - ride.startTime } ?: 0L
+                val minutes = (durationMs / 60000.0).toFloat()
+                Text(
+                    text = "Durée: ${String.format("%.1f", minutes)} min",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Distance: ${String.format("%.2f", ride.distance)} km",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
-}
-
-private fun formatDate(date: Date): String {
-    val formatter = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    return formatter.format(date)
-}
-
-private fun formatDuration(duration: Long): String {
-    val hours = duration / 3600
-    val minutes = (duration % 3600) / 60
-    val seconds = duration % 60
-    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
 } 

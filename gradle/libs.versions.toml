@@ -12,9 +12,11 @@ compose_navigation = "2.8.6"
 navigationCompose   = "2.8.7"
 lifecycleLivedataKtx = "2.8.7"
 runtimeLivedata     = "1.7.8"
+lifecycleRuntimeComposeAndroid = "2.8.7"
 
 [libraries]
 androidx-core-ktx             = { group = "androidx.core",            name = "core-ktx",            version.ref = "coreKtx" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
 junit                         = { group = "junit",                    name = "junit",               version.ref = "junit" }
 androidx-junit                = { group = "androidx.test.ext",        name = "junit",               version.ref = "junitVersion" }
 androidx-espresso-core        = { group = "androidx.test.espresso",   name = "espresso-core",       version.ref = "espressoCore" }
@@ -35,6 +37,7 @@ coroutines                    = { group = "org.jetbrains.kotlinx",    name = "ko
 androidx-runtime-livedata     = { group = "androidx.compose.runtime", name = "runtime-livedata",    version.ref = "runtimeLivedata" }
 retrofit                      = { group = "com.squareup.retrofit2",   name = "retrofit",            version = "2.11.0" }
 gson                          = { group = "com.squareup.retrofit2",   name = "converter-gson",      version = "2.11.0" }
+androidx-lifecycle-runtime-compose-android = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose-android", version.ref = "lifecycleRuntimeComposeAndroid" }
 
 [plugins]
 android-application     = { id = "com.android.application",   version.ref = "agp" }
