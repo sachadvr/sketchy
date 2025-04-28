@@ -43,8 +43,10 @@ import android.widget.Toast
 import com.example.myapplication.data.model.Coordinates
 import androidx.compose.material.icons.filled.Add
 import com.example.myapplication.ui.viewmodel.MainViewModel
+import android.os.Handler
+import android.os.Looper
 
-private const val IS_DEV_MODE = true 
+private const val IS_DEV_MODE = false
 private const val LILLE_CENTER_LAT = 50.6292
 private const val LILLE_CENTER_LON = 3.0573
 private const val MOCK_LOCATION_RADIUS = 0.002 
@@ -316,7 +318,7 @@ fun MapScreen(
 
     
     LaunchedEffect(isRideActive) {
-        if (isRideActive) {
+        if (isRideActive && IS_DEV_MODE) {
             Log.d("MapScreen", "Démarrage de la simulation de mouvement")
             
             while (isRideActive) {
@@ -393,32 +395,40 @@ fun MapScreen(
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(true)
                     
-                    
-                    
-                    myLocationOverlay = MyLocationNewOverlay(MockLocationProvider(context), this).apply {
+                    myLocationOverlay = if (IS_DEV_MODE) {
+                        MyLocationNewOverlay(MockLocationProvider(context), this)
+                    } else {
+                        MyLocationNewOverlay(GpsMyLocationProvider(context), this)
+                    }.apply {
                         enableMyLocation()
-                        
-                        
                     }
                     overlays.add(myLocationOverlay)
                     
+                    if (IS_DEV_MODE) {
+                        controller.setCenter(lilleCenterPoint)
+                        controller.setZoom(15.0)
+                    } else {
+                        // En mode production, on attend la localisation réelle
+                        myLocationOverlay?.runOnFirstFix {
+                            Handler(Looper.getMainLooper()).post {
+                                myLocationOverlay?.myLocation?.let { location ->
+                                    controller.animateTo(location)
+                                    controller.setZoom(15.0)
+                                }
+                            }
+                        }
+                    }
                     
-                    controller.setCenter(lilleCenterPoint)
-                    controller.setZoom(15.0)
                     isMapInitialized = true
-                    Log.d("MapScreen", "Carte initialisée et centrée sur Lille")
+                    Log.d("MapScreen", "Carte initialisée")
                     
                     mapView = this
-                    
                     
                     addSkateMarkers(this)
                 }
             },
             modifier = Modifier.fillMaxSize(),
             update = { view ->
-                
-                
-                
                 if (skates.isNotEmpty() && view.overlays.size <= 1) {
                     addSkateMarkers(view)
                 }
@@ -470,16 +480,24 @@ fun MapScreen(
             
             FloatingActionButton(
                 onClick = {
-                    mapView?.controller?.animateTo(lilleCenterPoint)
+                    if (IS_DEV_MODE) {
+                        mapView?.controller?.animateTo(lilleCenterPoint)
+                    } else {
+                        Handler(Looper.getMainLooper()).post {
+                            myLocationOverlay?.myLocation?.let { location ->
+                                mapView?.controller?.animateTo(location)
+                            }
+                        }
+                    }
                     mapView?.controller?.setZoom(15.0)
-                    Log.d("MapScreen", "Recentrage manuel sur Lille")
+                    Log.d("MapScreen", "Recentrage sur la position actuelle")
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
-                    contentDescription = "Centrer sur Lille"
+                    contentDescription = "Centrer sur ma position"
                 )
             }
         }

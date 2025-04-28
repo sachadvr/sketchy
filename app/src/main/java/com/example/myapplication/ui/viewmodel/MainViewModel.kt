@@ -10,6 +10,7 @@ import com.example.myapplication.data.model.SubscriptionPlan
 import com.example.myapplication.data.repository.RideRepository
 import com.example.myapplication.data.repository.SkateRepository
 import com.example.myapplication.data.repository.SubscriptionRepository
+import com.example.PricingCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -159,7 +160,7 @@ class MainViewModel @Inject constructor(
             _uiState.value.currentRide?.let { ride ->
                 val endTime = System.currentTimeMillis()
                 val durationMs = endTime - ride.startTime
-                val durationMinutes = durationMs / (1000 * 60)
+                val durationMinutes = (durationMs / (1000 * 60)).toInt()
                 
                 
                 var totalDistance = 0.0
@@ -191,7 +192,7 @@ class MainViewModel @Inject constructor(
                 }
                 
                 
-                val price = durationMinutes * 1.0 + totalDistance * 0.5
+                val price = PricingCalculator.calculatePrice(durationMinutes)
                 
                 Log.d("MainViewModel", "Fin de course - Durée: ${durationMinutes}min, Distance: ${totalDistance}km, Prix: ${price}€")
                 
